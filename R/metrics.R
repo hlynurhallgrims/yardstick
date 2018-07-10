@@ -111,7 +111,7 @@ metrics.data.frame  <-
         mae = mae_calc(data[[ vars$truth ]], data[[ vars$estimate ]])
       )
       } else {
-        grouping_vars <- group_vars(res)
+        grouping_vars <- dplyr::group_vars(res)
         
         res <- split(res, res[, c(grouping_vars) ]) %>% 
           map(~dplyr::tibble(
