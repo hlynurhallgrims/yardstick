@@ -55,31 +55,31 @@ metrics.data.frame  <-
       )
     all_vars <- unique(unlist(vars))
     all_vars <- all_vars[!is.na(all_vars)]
-
+    
     data <- data[, all_vars]
     if (na.rm)
       data <- data[complete.cases(data), ]
-
+    
     is_class <- is.factor(data[[ vars$truth ]])
     if (is_class) {
       if(!is.factor(data[[ vars$estimate ]]))
         stop("`estimate` should be a factor", call. = FALSE)
-
+      
       xtab <- vec2table(
         truth = data[[ vars$truth ]],
         estimate = data[[ vars$estimate ]],
         na.rm = na.rm,
         dnn = c("Prediction", "Truth")
       )
-
+      
       res <- dplyr::tibble(accuracy = accuracy(xtab),
                            kappa = kap(xtab))
-
+      
       has_probs <- !all(is.na(vars$probs))
       if (has_probs) {
         res$mnLogLoss <-
           mnLogLoss(data, vars$truth, !! vars$probs, na.rm = na.rm)
-
+        
         lvl <- levels(data[[ vars$truth ]])
         if (length(lvl) == 2) {
           col <- if (getOption("yardstick.event_first"))
@@ -93,24 +93,33 @@ metrics.data.frame  <-
               na.rm = na.rm,
               options = options
             )
-
+          
         } # end two_classes
-
+        
       } # end has_probs
-
+      
     } else {
       # Assume only regression for now
       if(!is.numeric(data[[ vars$estimate ]]))
         stop("`estimate` should be numeric", call. = FALSE)
-
+      
+      # Distinguish between group and non-grouped data
+      if (is.null(dplyr::groups(data))) {
       res <- dplyr::tibble(
         rmse = rmse_calc(data[[ vars$truth ]], data[[ vars$estimate ]]),
         rsq = rsq_calc(data[[ vars$truth ]], data[[ vars$estimate ]]),
         mae = mae_calc(data[[ vars$truth ]], data[[ vars$estimate ]])
       )
-
-    } # end regression
-
+      } else {
+        grouping_vars <- group_vars(res)
+        
+        res <- split(res, res[, c(grouping_vars) ]) %>% 
+          map(~dplyr::tibble(
+            rmse = rmse_calc(data[[ vars$truth ]], data[[ vars$estimate ]]),
+            rsq = rsq_calc(data[[ vars$truth ]], data[[ vars$estimate ]]),
+            mae = mae_calc(data[[ vars$truth ]], data[[ vars$estimate ]]))) %>% 
+          bind_rows(.id = stringr::str_flatten(grouping_vars, collapse = "-"))
+        } # end regression
+    
     res
   }
-
